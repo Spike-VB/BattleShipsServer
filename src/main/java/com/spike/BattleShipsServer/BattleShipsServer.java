@@ -7,6 +7,7 @@ public class BattleShipsServer {
 		gui.buildGui();
 		Server server = new Server();
 		server.startServer();
+		//server.startEmptyServer();
 	}
 
 }

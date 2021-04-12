@@ -9,26 +9,15 @@ public class Server {
 	private ServerSocket serSock;
 	private int numOfClients = 2;
 	private Socket[] clientSock = new Socket[numOfClients];
+	private ObjectInputStream[] ois = new ObjectInputStream[numOfClients];
+	private ObjectOutputStream[] oos = new ObjectOutputStream[numOfClients];
 	private Ship[][] ships = new Ship[numOfClients][];
 
 	public void startServer() {
-		//bss.startEmptyServer();
 		connect();
 		acceptClients();
 		readShips();
 		gameStart();
-	}
-	
-	private void startEmptyServer() {
-		try {
-			ServerSocket serSock = new ServerSocket(5050);
-			while(true) {
-				Socket sock = serSock.accept();
-			}
-		}
-		catch(IOException ex) {
-			ex.printStackTrace();
-		}
 	}
 	
 	private void connect() {
@@ -41,13 +30,14 @@ public class Server {
 	}
 	
 	private void acceptClients() {
-		int c = 0;
+		int i = 0;
 		
-		while(c < numOfClients) {
+		while(i < numOfClients) {
 			try {
-				Socket sock = serSock.accept();
-				clientSock[c] = sock;
-				c++;
+				clientSock[i] = serSock.accept();
+				oos[i] = new ObjectOutputStream(clientSock[i].getOutputStream());
+				ois[i] = new ObjectInputStream(clientSock[i].getInputStream());
+				i++;
 				System.out.println("Client is accepted");
 			}
 			catch (IOException e) {
@@ -57,42 +47,70 @@ public class Server {
 	}
 	
 	private void readShips() {
-		for(int i = 0; i < clientSock.length; i++) {
-			Socket sock = clientSock[i];
+		for(int i = 0; i < numOfClients; i++) {
 			try {
-				ObjectInputStream ois = new ObjectInputStream(sock.getInputStream());
-				ships[i] = (Ship[]) ois.readObject();
-				
-				for(int j = 0; j < ships[i].length; j++) {
-					ships[i][j].printShip();
-					System.out.println("");
-				}
+				ships[i] = (Ship[]) ois[i].readObject();
 			}
-			catch (IOException e) {
+			catch (ClassNotFoundException | IOException e) {
 				e.printStackTrace();
-			}
-			catch(ClassNotFoundException ex) {
-				ex.printStackTrace();
 			}
 		}
 	}
 	
-	private void gameStart() {
-		for(int i = 0; i < clientSock.length; i++) {
-			Socket sock = clientSock[i];
+	public void printPositions(int[][] position) {
+		for(int[] p : position) {
+			System.out.println(p[0] + "-" + p[1]);
+		}
+	}
+	
+	public void gameStart() {
+		int[] position = new int[2];
+		
+		int client = firstClientNum();
+		
+		while(true) {
+			
 			try {
-				ObjectInputStream ois = new ObjectInputStream(sock.getInputStream());
-				int[] position = (int[]) ois.readObject();
-				
-				System.out.println(position[0] + "-" + position[1]);
+				position = (int[]) ois[client].readObject();
 			}
-			catch (IOException e) {
+			catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();
 			}
-			catch(ClassNotFoundException ex) {
-				ex.printStackTrace();
+
+			for(int i = 0; i < numOfClients; i++) {
+				if(i != client) {
+					
+					boolean hit = false;
+					boolean killed = false;
+					
+					for(Ship s : ships[i]) {
+						hit = s.isHit(position[0], position[1]);
+						killed = s.isKilled();
+						if(hit) {
+							break;
+						}
+					}
+					
+					try {
+						oos[client].writeObject(new HitResponse(hit, killed));
+						oos[i].writeObject(new WaitingResponse(hit, position));
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					
+					if(!hit) {
+						client = i;
+					}
+				}
 			}
 		}
+	}
+	
+	private int firstClientNum() {
+		//int c;
+		//while((c = (int) (Math.ceil(Math.random() * 10) - 1) % numOfClients) == -1) {}
+		int c = Math.random() < 0.5d ? 0 : 1;
+		return c;
 	}
 
 }
