@@ -66,49 +66,46 @@ public class Server {
 	public void gameStart() {
 		int[] position = new int[2];
 		
-		int client = firstClientNum();
+		int shooter = firstClientNum();
 		
 		while(true) {
+			int waiter = numOfClients - 1 - shooter;
 			
 			try {
-				position = (int[]) ois[client].readObject();
+				position = (int[]) ois[shooter].readObject();
+				System.out.println(shooter + " client read shoot at " + position[0] + " : " + position[1]); 
 			}
 			catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();
 			}
 
-			for(int i = 0; i < numOfClients; i++) {
-				if(i != client) {
-					
-					boolean hit = false;
-					boolean killed = false;
-					
-					for(Ship s : ships[i]) {
-						hit = s.isHit(position[0], position[1]);
-						killed = s.isKilled();
-						if(hit) {
-							break;
-						}
-					}
-					
-					try {
-						oos[client].writeObject(new HitResponse(hit, killed));
-						oos[i].writeObject(new WaitingResponse(hit, position));
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-					
-					if(!hit) {
-						client = i;
-					}
+			boolean hit = false;
+			boolean killed = false;
+			
+			for(Ship s : ships[waiter]) {
+				hit = s.isHit(position[0], position[1]);
+				killed = s.isKilled();
+				if(hit) {
+					break;
 				}
+			}
+			
+			try {
+				oos[shooter].writeObject(new HitResponse(hit, killed));
+				System.out.println(shooter + " client write HitResponse with " + hit);
+				oos[waiter].writeObject(new WaitingResponse(hit, position));
+				System.out.println(waiter + " client write WaitingResponse with " + hit + " at " + position[0] + " : " + position[1]);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			if(!hit) {
+				shooter = waiter;
 			}
 		}
 	}
 	
 	private int firstClientNum() {
-		//int c;
-		//while((c = (int) (Math.ceil(Math.random() * 10) - 1) % numOfClients) == -1) {}
 		int c = Math.random() < 0.5d ? 0 : 1;
 		return c;
 	}
